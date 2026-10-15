@@ -14,7 +14,36 @@ Requires Herdr >= 0.9.5 and Node.js >= 22 on `PATH`. No npm dependencies.
 
 ## Usage
 
-Run the `new-worktree` action from a workspace. A popup asks for a branch name, an optional base ref, and the checkout path. The path prompt shows the configured default (e.g. `.claude/worktrees/feat-x`); press Enter to keep it. A relative path resolves against the repository root and an absolute path is used as-is. Paths inside the repository are added to `.git/info/exclude`. Esc or an empty branch cancels. Errors are shown in the popup until you press a key.
+Run the `new-worktree` action from a workspace. A popup shows one form with every field visible and editable at any time:
+
+```
+╭─ New worktree · my-repo ───────────────────────╮
+│ Branch     feat/vouchers                       │
+│ Base ref   ma                                  │
+│            ▸ main  origin/main                 │
+│ Path       .claude/worktrees/feat-vouchers     │
+│                                                │
+│ → /abs/path/my-repo/.claude/worktrees/feat-... │
+│ Layout: * · 2 tabs, 3 panes                    │
+│                                                │
+╰────────────────────────────────────────────────╯
+```
+
+- **Branch** is validated as you type. **Path** is optional: when empty, the dim placeholder is the default (e.g. `.claude/worktrees/feat-x`) and it follows the Branch text. A relative path resolves against the repository root and an absolute path is used as-is. Paths inside the repository are added to `.git/info/exclude`.
+- **Base ref** is optional and autocompletes from local and remote branches while it is focused (prefix matches first, then substring matches).
+- A validation error or a failed `herdr worktree create` keeps you in the form with the message in red, so you can fix it and retry. If only the layout fails, the worktree is kept and the error is shown until you press a key.
+- Set `NO_COLOR` to disable colors. Without a TTY (piped stdin) the plugin falls back to plain sequential prompts.
+
+| Key | Action |
+| --- | --- |
+| Type, Backspace, Delete, Left/Right, Home/End (Ctrl+A/Ctrl+E) | Edit the focused field. |
+| Ctrl+U | Clear the focused field. |
+| Tab, Down / Shift+Tab, Up | Next / previous field. |
+| Down / Up on Base ref | Move through suggestions (Up from the first clears the highlight). |
+| Tab or Right (at end of text) on Base ref | Accept the highlighted, or first, suggestion. |
+| Enter | Accept the highlighted suggestion; otherwise next field; on Path, create. |
+| Ctrl+S | Create from any field. |
+| Esc / Ctrl+C | Esc clears a highlighted suggestion first, otherwise cancels. Ctrl+C always cancels. |
 
 Example keybinding in your Herdr config:
 

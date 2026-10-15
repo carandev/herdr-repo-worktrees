@@ -110,11 +110,11 @@ function matchProject(projects, repoRoot, pathApi) {
   const root = fold(pathApi.resolve(repoRoot));
   const keys = Object.keys(projects).filter((k) => k !== WILDCARD);
   const byPath = keys.find((k) => pathApi.isAbsolute(k) && fold(pathApi.resolve(k)) === root);
-  if (byPath !== undefined) return projects[byPath];
+  if (byPath !== undefined) return { key: byPath, entry: projects[byPath] };
   const name = fold(pathApi.basename(root));
   const byName = keys.find((k) => !pathApi.isAbsolute(k) && fold(k) === name);
-  if (byName !== undefined) return projects[byName];
-  return projects[WILDCARD];
+  if (byName !== undefined) return { key: byName, entry: projects[byName] };
+  return projects[WILDCARD] ? { key: WILDCARD, entry: projects[WILDCARD] } : undefined;
 }
 
 function readUserConfig(data, file) {
@@ -157,11 +157,14 @@ export async function loadConfig({ repoRoot, configDir, fs, pathApi = nodePath }
     const userData = await readRaw(fs, userFile);
     if (userData) user = readUserConfig(userData, userFile);
   }
-  const project = matchProject(user.projects, repoRoot, pathApi);
+  const match = matchProject(user.projects, repoRoot, pathApi);
+  const project = match?.entry;
   const layout = project?.layout ?? [];
+  // layoutKey names the matched project entry (a key or "*"); absent when none matched.
+  const keyed = match ? { layoutKey: match.key } : {};
 
-  if (repoData?.directory !== undefined) return { directory: repoData.directory, layout, source: repoFile };
-  if (project?.directory !== undefined) return { directory: project.directory, layout, source: userFile };
-  if (user.directory !== undefined) return { directory: user.directory, layout, source: userFile };
-  return { directory: DEFAULT_DIRECTORY, layout, source: 'default' };
+  if (repoData?.directory !== undefined) return { directory: repoData.directory, layout, ...keyed, source: repoFile };
+  if (project?.directory !== undefined) return { directory: project.directory, layout, ...keyed, source: userFile };
+  if (user.directory !== undefined) return { directory: user.directory, layout, ...keyed, source: userFile };
+  return { directory: DEFAULT_DIRECTORY, layout, ...keyed, source: 'default' };
 }
