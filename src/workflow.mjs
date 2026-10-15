@@ -4,6 +4,7 @@ import { resolveWorktreePath } from './path.mjs';
 import { loadConfig } from './config.mjs';
 import { extractContext, resolveMainRepoRoot } from './context.mjs';
 import { ensureExcluded } from './exclude.mjs';
+import { applyLayout } from './layout.mjs';
 
 export function buildCreateArgs({ repoRoot, branch, worktreePath, base }) {
   const args = ['worktree', 'create', '--cwd', repoRoot, '--branch', branch, '--path', worktreePath, '--focus'];
@@ -32,7 +33,7 @@ export async function planRepoWorktree({ branch, base, ctx, env = {}, fs, git, p
   });
   const config = await loadConfig({ repoRoot, configDir: env.HERDR_PLUGIN_CONFIG_DIR, fs, pathApi });
   const defaultPath = resolveWorktreePath({ repoRoot, directory: config.directory, branch: name, pathApi });
-  return { branch: name, baseRef, repoRoot, commonDir, directory: config.directory, defaultPath };
+  return { branch: name, baseRef, repoRoot, commonDir, directory: config.directory, layout: config.layout, defaultPath };
 }
 
 /**
@@ -61,15 +62,26 @@ export async function executeRepoWorktree({ plan, path: pathInput, fs, herdr, pa
   const underConfigured = relativeInside(configuredDir, worktreePath, pathApi) !== null;
   const excludeDir = underConfigured ? plan.directory : relativeInside(root, worktreePath, pathApi);
   if (excludeDir) await ensureExcluded({ commonDir: plan.commonDir, directory: excludeDir, fs, pathApi });
+  let stdout;
   try {
-    const { stdout } = await herdr(
+    ({ stdout } = await herdr(
       buildCreateArgs({ repoRoot: plan.repoRoot, branch: plan.branch, worktreePath, base: plan.baseRef }),
-    );
-    return { worktreePath, repoRoot: plan.repoRoot, directory: plan.directory, output: stdout };
+    ));
   } catch (e) {
     const detail = [e.stderr, e.stdout].map((s) => String(s ?? '').trim()).find(Boolean) ?? e.message;
     throw new Error(`herdr worktree create failed: ${detail}`);
   }
+  const result = { worktreePath, repoRoot: plan.repoRoot, directory: plan.directory, output: stdout };
+  if (plan.layout?.length) {
+    // The worktree already exists; a layout failure is reported, never thrown.
+    try {
+      const { paneIds } = await applyLayout({ layout: plan.layout, worktreePath, createOutput: stdout, herdr, fs, pathApi });
+      result.layoutPaneIds = paneIds;
+    } catch (e) {
+      result.layoutError = e.message;
+    }
+  }
+  return result;
 }
 
 /** Plan + execute in one call. All validation happens before any side effect. */

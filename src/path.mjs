@@ -1,7 +1,7 @@
 import nodePath from 'node:path';
 import { slugifyBranch } from './slug.mjs';
 
-const looksAbsolute = (d) =>
+export const looksAbsolute = (d) =>
   nodePath.posix.isAbsolute(d) || nodePath.win32.isAbsolute(d) || /^[a-zA-Z]:/.test(d) || d.startsWith('\\');
 
 /**
