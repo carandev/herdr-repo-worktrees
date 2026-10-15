@@ -24,6 +24,13 @@ const fs = {
   },
   writeFile: (p, d) => fsp.writeFile(p, d, 'utf8'),
   mkdir: (p) => fsp.mkdir(p, { recursive: true }),
+  isDirectory: async (p) => {
+    try {
+      return (await fsp.stat(p)).isDirectory();
+    } catch {
+      return false;
+    }
+  },
 };
 const git = async (args, cwd) => (await run('git', args, { cwd, windowsHide: true })).stdout;
 const herdr = (args) => run(herdrBin, args, { windowsHide: true });
@@ -102,6 +109,10 @@ async function main() {
   if (pathInput === null) return;
   const result = await executeRepoWorktree({ plan, path: pathInput, fs, herdr });
   console.log(`Created ${result.worktreePath}`);
+  if (result.layoutError) {
+    console.error(`Layout failed: ${result.layoutError}`);
+    await waitForKey();
+  }
 }
 
 try {
