@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { buildCreateArgs, createRepoWorktree, planRepoWorktree, resolveTargetPath } from '../src/workflow.mjs';
+import { buildCreateArgs, createRepoWorktree, planFromRepo, planRepoWorktree, resolveRepoContext, resolveTargetPath } from '../src/workflow.mjs';
 
 test('buildCreateArgs without base', () => {
   assert.deepEqual(buildCreateArgs({ repoRoot: '/r', branch: 'b', worktreePath: '/r/w/b' }),
@@ -133,6 +133,18 @@ test('layout failure does not throw and is reported', async () => {
   assert.match(r.layoutError, /does not exist/);
   assert.equal(r.worktreePath, '/main/.claude/worktrees/b');
   assert.equal(d.calls.length, 1);
+});
+test('resolveRepoContext + planFromRepo work without a branch up front', async () => {
+  const d = layoutDeps([{ command: 'claude' }]);
+  const repo = await resolveRepoContext({ ctx: d.ctx, env: d.env, fs: d.fs, git: d.git, pathApi: d.pathApi });
+  assert.equal(repo.repoRoot, '/main');
+  assert.equal(repo.config.layout.length, 1);
+  assert.equal(repo.config.layoutKey, 'main');
+  const plan = planFromRepo({ repo, branch: 'feat/x', base: ' dev ', pathApi: d.pathApi });
+  assert.equal(plan.defaultPath, '/main/.claude/worktrees/feat-x');
+  assert.equal(plan.baseRef, 'dev');
+  assert.equal(plan.layout.length, 1);
+  assert.throws(() => planFromRepo({ repo, branch: '-x', pathApi: d.pathApi }), /branch/i);
 });
 test('no layout means no extra herdr calls', async () => {
   const d = deps();

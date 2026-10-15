@@ -162,3 +162,9 @@ test('label is allowed on entry 0 and tab entries, rejected with split', async (
   await bad([{ label: '' }], /layout\[0\]\.label/);
   await bad([{}, { label: 3 }], /layout\[1\]\.label/);
 });
+
+test('layoutKey names the matched project entry (including "*")', async () => {
+  assert.equal((await load({ projects: { 'Univer.CRM': {} } })).layoutKey, 'Univer.CRM');
+  assert.equal((await load({ projects: { '*': {} } })).layoutKey, '*');
+  assert.equal((await load({})).layoutKey, undefined);
+});

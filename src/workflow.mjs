@@ -20,20 +20,37 @@ function relativeInside(root, target, pathApi) {
 }
 
 /**
- * Resolves everything needed to create the worktree, without side effects.
+ * Repo context that does not depend on the branch: main repo root, git common dir and config.
  * Ports: fs {readFile}, git(args, cwd) -> stdout.
  */
-export async function planRepoWorktree({ branch, base, ctx, env = {}, fs, git, pathApi = nodePath, extraStartDirs = [] }) {
-  const name = validateBranch(branch);
-  const baseRef = base?.trim() ? validateBranch(base) : undefined;
+export async function resolveRepoContext({ ctx, env = {}, fs, git, pathApi = nodePath, extraStartDirs = [] }) {
   const { startDirs } = extractContext(ctx, env);
   const { repoRoot, commonDir } = await resolveMainRepoRoot({
     startDirs: [...startDirs, ...extraStartDirs],
     git,
   });
   const config = await loadConfig({ repoRoot, configDir: env.HERDR_PLUGIN_CONFIG_DIR, fs, pathApi });
+  return { repoRoot, commonDir, config };
+}
+
+/** Pure: validates branch/base and builds the plan from a resolved repo context. */
+export function planFromRepo({ repo, branch, base, pathApi = nodePath }) {
+  const name = validateBranch(branch);
+  const baseRef = base?.trim() ? validateBranch(base) : undefined;
+  const { repoRoot, commonDir, config } = repo;
   const defaultPath = resolveWorktreePath({ repoRoot, directory: config.directory, branch: name, pathApi });
   return { branch: name, baseRef, repoRoot, commonDir, directory: config.directory, layout: config.layout, defaultPath };
+}
+
+/**
+ * Resolves everything needed to create the worktree, without side effects.
+ * Ports: fs {readFile}, git(args, cwd) -> stdout.
+ */
+export async function planRepoWorktree({ branch, base, ctx, env = {}, fs, git, pathApi = nodePath, extraStartDirs = [] }) {
+  validateBranch(branch);
+  if (base?.trim()) validateBranch(base);
+  const repo = await resolveRepoContext({ ctx, env, fs, git, pathApi, extraStartDirs });
+  return planFromRepo({ repo, branch, base, pathApi });
 }
 
 /**
