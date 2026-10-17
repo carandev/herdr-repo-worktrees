@@ -56,6 +56,21 @@ command = "repo-worktrees.new-worktree"
 
 Plugins cannot register keybindings themselves; add this to your Herdr `config.toml` and run `herdr server reload-config`.
 
+### New workspace in a chosen directory
+
+Herdr's native "new workspace" inherits the source workspace's directory (`[terminal] new_cwd = "follow"`). The `new-workspace` action asks where to open instead, then runs `herdr workspace create --cwd <dir> [--label <text>] --focus`.
+
+- **Directory** is prefilled with the source workspace directory. `~` expands to your home, a relative path resolves against the source directory, and it must already exist (nothing is created).
+- **Label** is optional.
+- Errors (including herdr failures) appear in the form status line and keep it open. Enter moves to the next field and creates from Label; Ctrl+S creates from any field; Esc cancels.
+
+```toml
+[[keys.command]]
+key = "prefix+alt+n"
+type = "plugin_action"
+command = "repo-worktrees.new-workspace"
+```
+
 ## Configuration
 
 Two files are read:

@@ -20,3 +20,7 @@ test('parseContextJson tolerates missing and invalid input', () => {
   assert.equal(parseContextJson(undefined), null);
   assert.equal(parseContextJson('{bad'), null);
 });
+test('buildPaneOpenArgs accepts a custom entrypoint', () => {
+  assert.deepEqual(buildPaneOpenArgs({ pluginId: 'p', entrypoint: 'workspace-prompt' }),
+    ['plugin', 'pane', 'open', '--plugin', 'p', '--entrypoint', 'workspace-prompt', '--focus']);
+});
