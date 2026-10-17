@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { stripVerbatimPrefix, extractContext, resolveMainRepoRoot } from '../src/context.mjs';
+import { stripVerbatimPrefix, extractContext, focusedPaneCwd, resolveMainRepoRoot } from '../src/context.mjs';
 
 test('stripVerbatimPrefix removes the Windows verbatim prefix only', () => {
   assert.equal(stripVerbatimPrefix('\\\\?\\C:\\a\\b'), 'C:\\a\\b');
@@ -39,4 +39,20 @@ test('resolveMainRepoRoot falls back to toplevel for non-.git common dir', async
 });
 test('resolveMainRepoRoot errors when nothing works', async () => {
   await assert.rejects(resolveMainRepoRoot({ startDirs: [], git: async () => '' }), /repository/i);
+});
+const paneList = (panes) => JSON.stringify({ result: { type: 'pane_list', panes } });
+test('focusedPaneCwd prefers the focused pane and strips the verbatim prefix', () => {
+  const out = paneList([
+    { pane_id: 'w1:p1', cwd: 'C:\\a', focused: false },
+    { pane_id: 'w1:p2', cwd: '\\\\?\\C:\\b', focused: true },
+  ]);
+  assert.equal(focusedPaneCwd(out), 'C:\\b');
+});
+test('focusedPaneCwd falls back to the first pane with a cwd', () => {
+  assert.equal(focusedPaneCwd(paneList([{ pane_id: 'p0' }, { pane_id: 'p1', cwd: '/x' }, { pane_id: 'p2', cwd: '/y' }])), '/x');
+});
+test('focusedPaneCwd returns undefined for garbage or no cwd', () => {
+  assert.equal(focusedPaneCwd('not json'), undefined);
+  assert.equal(focusedPaneCwd(paneList([{ pane_id: 'p1' }])), undefined);
+  assert.equal(focusedPaneCwd(JSON.stringify({ result: {} })), undefined);
 });

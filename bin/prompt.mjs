@@ -7,7 +7,7 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { executeRepoWorktree, planFromRepo, planRepoWorktree, resolveRepoContext } from '../src/workflow.mjs';
 import { parseContextJson } from '../src/pane.mjs';
-import { extractContext } from '../src/context.mjs';
+import { extractContext, focusedPaneCwd } from '../src/context.mjs';
 import { decodeKeys } from '../src/keys.mjs';
 import { createForm, parseRefs, render, setStatus, update } from '../src/form.mjs';
 
@@ -65,7 +65,17 @@ async function loadContext() {
       const { stdout } = await herdr(['workspace', 'get', workspaceId]);
       ctx = { workspace: JSON.parse(stdout)?.result?.workspace };
     } catch {
-      // fall through to the process cwd
+      // fall through to the pane cwd
+    }
+    if (extractContext(ctx, env).startDirs.length === 0) {
+      // Workspaces opened in a plain directory carry no worktree info; their panes still report a cwd.
+      // Never fall back to process.cwd(): Herdr runs plugin commands from the plugin directory.
+      try {
+        const cwd = focusedPaneCwd((await herdr(['pane', 'list', '--workspace', workspaceId])).stdout);
+        if (cwd) ctx = { workspace: { ...(ctx?.workspace ?? {}), cwd } };
+      } catch {
+        // resolveRepoContext reports the missing repository
+      }
     }
   }
   return ctx;
@@ -133,7 +143,7 @@ function runForm(initial, repo) {
 
 async function mainForm() {
   const ctx = await loadContext();
-  const repo = await resolveRepoContext({ ctx, env, fs, git, extraStartDirs: [process.cwd()] });
+  const repo = await resolveRepoContext({ ctx, env, fs, git });
   const form = createForm({
     repoName: path.basename(repo.repoRoot),
     repoRoot: repo.repoRoot,
@@ -162,7 +172,7 @@ async function mainSequential() {
   const base = (await readLine('Base ref (optional): '))?.trim();
   if (base === null) return;
   const ctx = await loadContext();
-  const plan = await planRepoWorktree({ branch, base, ctx, env, fs, git, extraStartDirs: [process.cwd()] });
+  const plan = await planRepoWorktree({ branch, base, ctx, env, fs, git });
   const shown = path.relative(plan.repoRoot, plan.defaultPath).split(path.sep).join('/');
   const pathInput = await readLine(`Path [${shown}]: `);
   if (pathInput === null) return;

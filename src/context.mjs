@@ -26,6 +26,22 @@ export function extractContext(ctx, env = {}) {
 }
 
 /**
+ * Cwd of the focused pane (else the first pane with a cwd) from `herdr pane list` stdout.
+ * Herdr only attaches worktree info to some workspaces; pane cwds are always reported.
+ */
+export function focusedPaneCwd(stdout) {
+  let panes;
+  try {
+    panes = JSON.parse(stdout)?.result?.panes;
+  } catch {
+    return undefined;
+  }
+  const withCwd = Array.isArray(panes) ? panes.filter((p) => isObj(p) && str(p.cwd)) : [];
+  const pane = withCwd.find((p) => p.focused) ?? withCwd[0];
+  return pane ? stripVerbatimPrefix(pane.cwd) : undefined;
+}
+
+/**
  * Finds the MAIN repository root (never a linked worktree's checkout) from the
  * parent of `git rev-parse --git-common-dir`. `git(args, cwd)` returns stdout.
  */
