@@ -94,17 +94,47 @@ test('renaming a project in its view keeps the view on the renamed key', () => {
   assert.equal(rowsFor(state).filter((r) => r.id === 'entry').length, 1);
 });
 
-test('the split choice cycles with Enter/arrows and shows ratio/from only for splits', () => {
+test('Opens as is the first row and stays selected while the rows below it change', () => {
   const user = { projects: { P: { layout: [{}, { split: 'right' }] } } };
   // main: directory, P, add → open P; project: name, dir, entry0, entry1 → open entry 1.
   let { state } = type(editor(user), `${DOWN}${ENTER}${DOWN}${DOWN}${DOWN}${ENTER}`);
   assert.equal(state.stack.at(-1).index, 1);
-  assert.deepEqual(rowsFor(state).map((r) => r.id), ['command', 'cwd', 'split', 'ratio', 'from']);
-  ({ state } = type(state, `${DOWN}${DOWN}\x1b[C`));
+  assert.deepEqual(rowsFor(state).map((r) => r.id), ['split', 'command', 'cwd', 'ratio', 'from']);
+  const selected = (s) => rowsFor(s)[selectedIndex(s)].id;
+  ({ state } = type(state, '\x1b[C'));
   assert.deepEqual(state.draft.user.projects.P.layout[1], { split: 'down' });
+  assert.equal(selected(state), 'split');
   ({ state } = type(state, ENTER));
   assert.deepEqual(state.draft.user.projects.P.layout[1], {});
-  assert.deepEqual(rowsFor(state).map((r) => r.id), ['command', 'label', 'cwd', 'split']);
+  assert.deepEqual(rowsFor(state).map((r) => r.id), ['split', 'command', 'label', 'cwd']);
+  assert.equal(selected(state), 'split');
+  ({ state } = type(state, `${ENTER}${ENTER}`));
+  assert.deepEqual(state.draft.user.projects.P.layout[1], { split: 'down' });
+  assert.equal(selected(state), 'split');
+});
+
+test('Split from lists earlier entries by name; Enter opens the list, Enter applies, Esc cancels', () => {
+  const layout = [{ label: 'claude', command: 'claude' }, { label: 'api' }, { split: 'down', command: 'npm test' }, { split: 'right' }];
+  // Open entry 3, then go to its last row (Split from).
+  let { state } = type(editor({ projects: { P: { layout } } }), `${DOWN}${ENTER}${DOWN}${DOWN}${DOWN}${DOWN}${DOWN}${ENTER}\x1b[F`);
+  const from = rowsFor(state)[selectedIndex(state)];
+  assert.equal(from.id, 'from');
+  assert.deepEqual(from.options.map((o) => o.label), ['0 · claude', '1 · api', '2 · api › npm test']);
+  assert.equal(from.value, 2);
+  ({ state } = type(state, ENTER));
+  assert.equal(state.pick.index, 2);
+  const plain = strip(render(state, { columns: 80, rows: 24, color: false }).text);
+  assert.match(plain, /Split from +2 · api › npm test ▾/);
+  assert.match(plain, /│ {23}0 · claude +│/);
+  assert.match(plain, /▸ 2 · api › npm test {2}\(current\)/);
+  ({ state } = type(state, `${'\x1b[A'}${ESC}`));
+  assert.equal(state.pick, null);
+  assert.equal(state.draft.user.projects.P.layout[3].from, undefined);
+  ({ state } = type(state, `${ENTER}${'\x1b[A'}${'\x1b[A'}${ENTER}`));
+  assert.equal(state.draft.user.projects.P.layout[3].from, 0);
+  assert.equal(rowsFor(state)[selectedIndex(state)].id, 'from');
+  ({ state } = type(state, '\x1b[D'));
+  assert.equal(state.draft.user.projects.P.layout[3].from, undefined, 'wraps to the previous entry, the default');
 });
 
 test('d asks before deleting; moving away cancels the confirmation', () => {

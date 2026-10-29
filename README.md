@@ -99,15 +99,15 @@ From a terminal, run it inside a repository with `node <plugin-dir>/bin/config.m
 
 - **Main view**: the default `directory`, the current repository's `.herdr/worktrees.json` directory (shown only inside a repository), and the list of projects (`*` is listed as "every other repository").
 - **Project view**: name, `directory` and the layout entries, each summarised (for example `split down 0.3 from 1 · lazygit`).
-- **Entry view**: `command`, `label` (root and tab entries only), `cwd`, and on later entries "Opens as" (`tab`, `right` or `down`), with `ratio` and `from` for splits.
+- **Entry view**: on later entries "Opens as" (`tab`, `right` or `down`) comes first, then `command`, `label` (root and tab entries only), `cwd`, and for splits `ratio` and "Split from". "Split from" lists the earlier entries by name: a tab's label (or command), and `<tab> › <command>` for a split.
 
 Every change is validated with the same rules the plugin applies when it creates a worktree. The first error is shown in red, and saving is blocked until it is fixed. Clearing a field removes the key. Deleting or reordering entries renumbers the `from` references. Unknown top-level keys are kept. Files are written only on save, and only when they changed. Quitting with unsaved changes asks for a second press.
 
 | Key | Action |
 | --- | --- |
 | Up/Down (j/k), Tab/Shift+Tab | Move the selection. |
-| Enter | Edit the value, open the project or entry, or cycle "Opens as". |
-| Left/Right, Space | Cycle "Opens as". |
+| Enter | Edit the value, open the project or entry, cycle "Opens as", or open the "Split from" list (Up/Down, Enter to apply, Esc to cancel). |
+| Left/Right, Space | Cycle "Opens as" or "Split from". |
 | a | Add a project (main view) or a layout entry (project view). |
 | d (twice) or Delete (twice) | Delete the selected project or entry. |
 | J / K | Move the selected layout entry down / up. |

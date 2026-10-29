@@ -5,6 +5,7 @@ import {
   addEntry,
   addProject,
   describeEntry,
+  entryTitle,
   moveEntry,
   parseConfigText,
   removeEntry,
@@ -114,4 +115,20 @@ test('describeEntry summarises the kind, label, command and cwd', () => {
   assert.equal(describeEntry({ label: 'claude', command: 'claude' }, 0), 'root pane · "claude" · claude');
   assert.equal(describeEntry({ split: 'down', ratio: 0.3, command: 'lazygit' }, 2), 'split down 0.3 from 1 · lazygit');
   assert.equal(describeEntry({ cwd: 'src' }, 1), 'tab · cwd src');
+});
+
+test('entryTitle names tabs by label and splits by the tab they land in', () => {
+  const layout = [
+    { command: 'claude' },
+    { label: 'api', cwd: 'src/api' },
+    { split: 'down', command: 'npm test' },
+    { split: 'right', from: 0 },
+    {},
+  ];
+  assert.equal(entryTitle(layout, 0), 'claude');
+  assert.equal(entryTitle(layout, 1), 'api');
+  assert.equal(entryTitle(layout, 2), 'api › npm test');
+  assert.equal(entryTitle(layout, 3), 'claude › shell');
+  assert.equal(entryTitle(layout, 4), 'tab');
+  assert.equal(entryTitle([{}], 0), 'root pane');
 });
