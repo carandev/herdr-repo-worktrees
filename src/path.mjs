@@ -5,12 +5,10 @@ export const looksAbsolute = (d) =>
   nodePath.posix.isAbsolute(d) || nodePath.win32.isAbsolute(d) || /^[a-zA-Z]:/.test(d) || d.startsWith('\\');
 
 /**
- * Absolute worktree path: <repoRoot>/<directory>/<branch-slug>.
- * Rejects absolute directories and anything that resolves outside repoRoot.
- * `pathApi` is injectable (path.posix / path.win32) for deterministic tests;
- * path.win32 comparisons are case-insensitive.
+ * Absolute worktree directory for `directory` under `repoRoot`.
+ * Rejects absolute directories, the repository root and anything that resolves outside repoRoot.
  */
-export function resolveWorktreePath({ repoRoot, directory, branch, pathApi = nodePath }) {
+export function resolveWorktreeDirectory({ repoRoot, directory, pathApi = nodePath }) {
   if (typeof directory !== 'string' || !directory.trim()) {
     throw new Error('Worktree directory must be a non-empty string');
   }
@@ -26,5 +24,14 @@ export function resolveWorktreePath({ repoRoot, directory, branch, pathApi = nod
   if (rel === '..' || rel.startsWith('..' + pathApi.sep) || pathApi.isAbsolute(rel)) {
     throw new Error(`Worktree directory escapes the repository: ${directory}`);
   }
-  return pathApi.join(dirAbs, slugifyBranch(branch));
+  return dirAbs;
+}
+
+/**
+ * Absolute worktree path: <repoRoot>/<directory>/<branch-slug>.
+ * `pathApi` is injectable (path.posix / path.win32) for deterministic tests;
+ * path.win32 comparisons are case-insensitive.
+ */
+export function resolveWorktreePath({ repoRoot, directory, branch, pathApi = nodePath }) {
+  return pathApi.join(resolveWorktreeDirectory({ repoRoot, directory, pathApi }), slugifyBranch(branch));
 }

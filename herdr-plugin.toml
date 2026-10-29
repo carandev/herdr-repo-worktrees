@@ -32,3 +32,17 @@ placement = "popup"
 width = "70%"
 height = "30%"
 command = ["node", "bin/workspace-prompt.mjs"]
+
+[[actions]]
+id = "configure"
+title = "Configure repo worktrees"
+contexts = ["workspace"]
+command = ["node", "bin/open-config.mjs"]
+
+[[panes]]
+id = "config"
+title = "Repo worktrees config"
+placement = "popup"
+width = "80%"
+height = "70%"
+command = ["node", "bin/config.mjs"]

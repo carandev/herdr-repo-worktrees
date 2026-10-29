@@ -139,6 +139,15 @@ function readUserConfig(data, file) {
 }
 
 /**
+ * Validates a parsed user config object with the same rules `loadConfig` applies.
+ * Returns the normalized `{ directory, projects }`; throws an Error naming the offending key.
+ */
+export function validateUserConfig(data, file = 'config.json') {
+  if (!isObject(data)) throw new Error(`${file} must contain a JSON object`);
+  return readUserConfig(data, file);
+}
+
+/**
  * Directory precedence: <repo>/.herdr/worktrees.json > matched project's (or selected "*") directory
  * > user top-level directory > built-in default.
  * Layout and projects are read ONLY from the user config, never from the repo file,

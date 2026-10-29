@@ -84,6 +84,38 @@ Two files are read:
 
 `directory` must be relative and must stay inside the repository. Absolute paths and `..` escapes are rejected. Invalid JSON produces an error naming the file. Unknown top-level keys are ignored; unknown keys inside a project or a layout entry are errors. The full `directory` precedence is listed under [Per-project settings](#per-project-settings-and-pane-layout).
 
+### Edit the configuration interactively
+
+The `configure` action opens a popup editor, so you never have to edit the JSON files by hand:
+
+```toml
+[[keys.command]]
+key = "prefix+alt+c"
+type = "plugin_action"
+command = "repo-worktrees.configure"
+```
+
+From a terminal, run it inside a repository with `node <plugin-dir>/bin/config.mjs`. That repository's file is editable too, and the user config is located with `herdr plugin config-dir repo-worktrees`.
+
+- **Main view**: the default `directory`, the current repository's `.herdr/worktrees.json` directory (shown only inside a repository), and the list of projects (`*` is listed as "every other repository").
+- **Project view**: name, `directory` and the layout entries, each summarised (for example `split down 0.3 from 1 · lazygit`).
+- **Entry view**: `command`, `label` (root and tab entries only), `cwd`, and on later entries "Opens as" (`tab`, `right` or `down`), with `ratio` and `from` for splits.
+
+Every change is validated with the same rules the plugin applies when it creates a worktree. The first error is shown in red, and saving is blocked until it is fixed. Clearing a field removes the key. Deleting or reordering entries renumbers the `from` references. Unknown top-level keys are kept. Files are written only on save, and only when they changed. Quitting with unsaved changes asks for a second press.
+
+| Key | Action |
+| --- | --- |
+| Up/Down (j/k), Tab/Shift+Tab | Move the selection. |
+| Enter | Edit the value, open the project or entry, or cycle "Opens as". |
+| Left/Right, Space | Cycle "Opens as". |
+| a | Add a project (main view) or a layout entry (project view). |
+| d (twice) or Delete (twice) | Delete the selected project or entry. |
+| J / K | Move the selected layout entry down / up. |
+| Ctrl+S | Save. |
+| Esc | Back; on the main view, quit. q and Ctrl+C also quit. |
+
+While editing a value: Enter or Tab applies it, Esc cancels, and Ctrl+U clears it.
+
 ### Per-project settings and pane layout
 
 The user config (`$HERDR_PLUGIN_CONFIG_DIR/config.json`) may define a `projects` map. After the worktree is created, the project's `layout` is applied to the new workspace.
