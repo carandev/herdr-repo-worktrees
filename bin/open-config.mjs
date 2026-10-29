@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+// Action entrypoint: opens the popup pane with the interactive config editor.
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { buildPaneOpenArgs, parseContextJson } from '../src/pane.mjs';
+import { extractContext } from '../src/context.mjs';
+
+const run = promisify(execFile);
+const env = process.env;
+const contextJson = env.HERDR_PLUGIN_CONTEXT_JSON;
+const { workspaceId } = extractContext(parseContextJson(contextJson), env);
+
+try {
+  await run(
+    env.HERDR_BIN_PATH || 'herdr',
+    buildPaneOpenArgs({
+      pluginId: env.HERDR_PLUGIN_ID || 'repo-worktrees',
+      workspaceId,
+      contextJson,
+      entrypoint: 'config',
+    }),
+    { windowsHide: true },
+  );
+} catch (e) {
+  console.error(`repo-worktrees: could not open config pane: ${e.stderr || e.message}`);
+  process.exit(1);
+}
