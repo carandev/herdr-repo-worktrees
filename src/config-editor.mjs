@@ -12,6 +12,7 @@ import {
   addProject,
   describeEntry,
   describeProject,
+  entryTitle,
   getLayout,
   getProject,
   moveEntry,
@@ -44,6 +45,7 @@ export function createEditor({ draft, files, repoRoot, saved, pathApi = nodePath
     saved: { ...saved },
     stack: [{ view: 'main', sel: 0 }],
     edit: null,
+    pick: null,
     pending: null,
     status: '',
     error: '',
@@ -128,19 +130,22 @@ export function rowsFor(state) {
     rows.push({ kind: 'link', id: 'addEntry', label: '+ Add entry' });
     return rows;
   }
-  const entry = getLayout(draft, view.key)[view.index] ?? {};
+  const layout = getLayout(draft, view.key);
+  const entry = layout[view.index] ?? {};
   const i = view.index;
-  const rows = [{ kind: 'text', id: 'command', label: 'Command', value: entry.command ?? '', placeholder: 'plain shell' }];
+  // "Opens as" comes first: changing it adds or removes rows, and none of them may shift it.
+  const rows = [];
+  if (i > 0) rows.push({ kind: 'choice', id: 'split', label: 'Opens as', value: entry.split ?? 'tab', options: SPLITS });
+  rows.push({ kind: 'text', id: 'command', label: 'Command', value: entry.command ?? '', placeholder: 'plain shell' });
   if (i === 0 || entry.split === undefined) {
     rows.push({ kind: 'text', id: 'label', label: 'Tab label', value: entry.label ?? '', placeholder: 'none' });
   }
   rows.push({ kind: 'text', id: 'cwd', label: 'Cwd', value: entry.cwd ?? '', placeholder: 'worktree root' });
-  if (i > 0) {
-    rows.push({ kind: 'choice', id: 'split', label: 'Opens as', value: entry.split ?? 'tab', options: SPLITS });
-    if (entry.split !== undefined) {
-      rows.push({ kind: 'text', id: 'ratio', label: 'Ratio', value: entry.ratio === undefined ? '' : String(entry.ratio), placeholder: 'herdr default' });
-      rows.push({ kind: 'text', id: 'from', label: 'Split from', value: entry.from === undefined ? '' : String(entry.from), placeholder: `${i - 1} (previous)` });
-    }
+  if (i > 0 && entry.split !== undefined) {
+    rows.push({ kind: 'text', id: 'ratio', label: 'Ratio', value: entry.ratio === undefined ? '' : String(entry.ratio), placeholder: 'herdr default' });
+    const options = layout.slice(0, i).map((_, j) => ({ value: j, label: `${j} · ${entryTitle(layout, j)}` }));
+    const from = Number.isInteger(entry.from) ? entry.from : i - 1;
+    rows.push({ kind: 'pick', id: 'from', label: 'Split from', value: from, options });
   }
   return rows;
 }
@@ -242,11 +247,60 @@ function updateEdit(state, key) {
   }
 }
 
-function cycle(state, row, delta) {
-  const { options } = row;
-  const value = options[(options.indexOf(row.value) + delta + options.length) % options.length];
+const optionValue = (o) => (typeof o === 'object' ? o.value : o);
+
+/** Keeps the selection on the row `id` after the rows of the view changed. */
+function reselect(state, id) {
+  const index = rowsFor(state).findIndex((r) => r.id === id);
+  return index < 0 ? state : withTop(state, { sel: index });
+}
+
+/** Sets a choice or pick row; picking the previous entry as `from` removes the key (it is the default). */
+function choose(state, row, value) {
   const view = top(state);
-  return changed(state, setEntryField(state.draft, view.key, view.index, row.id, value));
+  const text = row.id === 'from' ? (value === view.index - 1 ? '' : String(value)) : value;
+  return reselect(changed(state, setEntryField(state.draft, view.key, view.index, row.id, text)), row.id);
+}
+
+function cycle(state, row, delta) {
+  const values = row.options.map(optionValue);
+  return choose(state, row, values[(values.indexOf(row.value) + delta + values.length) % values.length]);
+}
+
+/** Opens the vertical option list of a pick row with the current value highlighted. */
+const openPick = (state, row) => ({
+  ...state,
+  pick: { id: row.id, index: Math.max(0, row.options.findIndex((o) => o.value === row.value)) },
+  pending: null,
+  status: '',
+});
+
+function updatePick(state, key, row) {
+  const n = row.options.length;
+  const to = (index) => ({ state: { ...state, pick: { ...state.pick, index } } });
+  switch (key.name) {
+    case 'up':
+    case 'shift-tab':
+      return to(Math.max(0, state.pick.index - 1));
+    case 'down':
+    case 'tab':
+      return to(Math.min(n - 1, state.pick.index + 1));
+    case 'char':
+      if (key.ch === 'k') return to(Math.max(0, state.pick.index - 1));
+      if (key.ch === 'j') return to(Math.min(n - 1, state.pick.index + 1));
+      return { state };
+    case 'home':
+      return to(0);
+    case 'end':
+      return to(n - 1);
+    case 'enter':
+      return { state: choose({ ...state, pick: null }, row, row.options[state.pick.index].value) };
+    case 'escape':
+    case 'ctrl-c':
+      return { state: { ...state, pick: null } };
+    default:
+      return { state };
+  }
 }
 
 function activate(state, row) {
@@ -255,6 +309,8 @@ function activate(state, row) {
       return startEdit(state, row);
     case 'choice':
       return cycle(state, row, 1);
+    case 'pick':
+      return openPick(state, row);
     default:
       break;
   }
@@ -310,6 +366,8 @@ export function update(state, key) {
   if (state.edit) return updateEdit(state, key);
   const rows = rowsFor(state);
   const row = rows[selectedIndex(state)];
+  if (state.pick) return updatePick(state, key, row);
+  const cycles = row.kind === 'choice' || row.kind === 'pick';
   switch (key.name) {
     case 'up':
     case 'shift-tab':
@@ -325,7 +383,7 @@ export function update(state, key) {
       return { state: activate(state, row) };
     case 'left':
     case 'right':
-      return { state: row.kind === 'choice' ? cycle(state, row, key.name === 'left' ? -1 : 1) : state };
+      return { state: cycles ? cycle(state, row, key.name === 'left' ? -1 : 1) : state };
     case 'delete':
       return { state: remove(state, row) };
     case 'ctrl-s':
@@ -353,7 +411,7 @@ export function update(state, key) {
         case 'q':
           return quit(state);
         case ' ':
-          return { state: row.kind === 'choice' ? cycle(state, row, 1) : state };
+          return { state: cycles ? cycle(state, row, 1) : state };
         default:
           return { state };
       }
@@ -388,7 +446,8 @@ function breadcrumb(state) {
 const HINTS = {
   main: '↑↓ move · Enter open/edit · a add · d delete · Ctrl+S save · Esc quit',
   project: '↑↓ move · Enter open/edit · a add entry · d delete · J/K reorder · Ctrl+S save · Esc back',
-  entry: '↑↓ move · Enter edit · ←→ change · Ctrl+S save · Esc back',
+  entry: '↑↓ move · Enter edit/choose · ←→ change · Ctrl+S save · Esc back',
+  pick: '↑↓ choose · Enter apply · Esc cancel',
 };
 
 /**
@@ -408,8 +467,14 @@ export function render(state, { columns = 80, rows: height = 24, color = true } 
   const sel = selectedIndex(state);
   const view = top(state);
   const editingNew = state.edit?.id === 'newProject';
-  const items = editingNew ? [...rows.slice(0, -1), { kind: 'text', id: 'newProject', label: 'New project', value: '' }] : rows;
-  const selRow = editingNew ? items.length - 1 : sel;
+  let items = editingNew ? [...rows.slice(0, -1), { kind: 'text', id: 'newProject', label: 'New project', value: '' }] : rows;
+  let selRow = editingNew ? items.length - 1 : sel;
+  if (state.pick) {
+    // The open pick list is drawn as extra rows under its field; the highlighted option is "selected".
+    const options = rows[sel].options.map((o, k) => ({ kind: 'option', label: o.label, current: o.value === rows[sel].value, k }));
+    items = [...rows.slice(0, sel + 1), ...options, ...rows.slice(sel + 1)];
+    selRow = sel + 1 + state.pick.index;
+  }
 
   // Box chrome: title, file line, blank, two error lines, status, bottom border, hint.
   const visible = Math.max(3, height - 8);
@@ -425,9 +490,15 @@ export function render(state, { columns = 80, rows: height = 24, color = true } 
   items.slice(offset, offset + visible).forEach((row, k) => {
     const i = offset + k;
     const isSel = i === selRow;
+    const isOwner = state.pick && i === sel;
     const mark = isSel ? '▸ ' : '  ';
     if (row.kind === 'heading') {
       lines.push(line([{ t: '  ' }, { t: fit(row.label, IW - 2), st: '1' }]));
+      return;
+    }
+    if (row.kind === 'option') {
+      const text = `${isSel ? '▸ ' : '  '}${row.label}${row.current ? '  (current)' : ''}`;
+      lines.push(line([{ t: ' '.repeat(LABEL_W + 2) }, { t: fit(text, VW), st: isSel ? '1;36' : '2' }]));
       return;
     }
     if (row.kind === 'link') {
@@ -443,9 +514,12 @@ export function render(state, { columns = 80, rows: height = 24, color = true } 
       cursor = { row: lines.length, col: 5 + LABEL_W + win.col };
       return;
     }
-    const value = row.kind === 'choice' ? row.options.map((o) => (o === row.value ? `[${o}]` : ` ${o} `)).join(' ') : row.value;
+    let value = row.value;
+    if (row.kind === 'choice') value = row.options.map((o) => (o === row.value ? `[${o}]` : ` ${o} `)).join(' ');
+    if (row.kind === 'pick') value = `${row.options.find((o) => o.value === row.value)?.label ?? row.value} ▾`;
     const shown = value ? { t: fit(value, VW) } : { t: fit(row.placeholder ?? '', VW), st: '2' };
-    lines.push(line([{ t: mark, st: '36' }, { t: label, st: isSel ? '1;36' : '2' }, shown]));
+    const active = isSel || isOwner;
+    lines.push(line([{ t: active ? '▸ ' : '  ', st: '36' }, { t: label, st: active ? '1;36' : '2' }, shown]));
   });
   while (lines.length < 3 + visible) lines.push(line([]));
   // Errors wrap onto a second line: the useful part (what is wrong) usually comes last.
@@ -453,7 +527,7 @@ export function render(state, { columns = 80, rows: height = 24, color = true } 
   lines.push(line([{ t: fit(state.error.slice(IW), IW), st: '31' }]));
   lines.push(line([{ t: fit(state.status, IW), st: state.status === 'Saved' ? '32' : '33' }]));
   lines.push(`╰${'─'.repeat(W - 2)}╯`);
-  const hint = state.edit ? 'Enter/Tab apply · Esc cancel · Ctrl+U clear' : HINTS[view.view];
+  const hint = state.edit ? 'Enter/Tab apply · Esc cancel · Ctrl+U clear' : HINTS[state.pick ? 'pick' : view.view];
   lines.push(sgr('2', fit(` ${hint}`, W)));
   return { text: lines.join('\r\n'), cursor };
 }

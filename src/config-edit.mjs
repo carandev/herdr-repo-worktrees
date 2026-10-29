@@ -205,6 +205,25 @@ export function describeEntry(entry, index) {
   return parts.join(' · ');
 }
 
+const ownName = (e) => e.label ?? e.command ?? (e.cwd !== undefined ? `cwd ${e.cwd}` : undefined);
+
+/**
+ * Short name of layout entry `j` for pickers: a tab's label (else command or cwd), and for a
+ * split `<tab> › <command>`, where <tab> is the tab it ends up in (following `from`).
+ */
+export function entryTitle(layout, j) {
+  const e = layout[j] ?? {};
+  if (j === 0 || e.split === undefined) return ownName(e) ?? (j === 0 ? 'root pane' : 'tab');
+  let t = j;
+  for (let guard = 0; t > 0 && layout[t]?.split !== undefined && guard < layout.length; guard += 1) {
+    const from = layout[t].from;
+    t = Number.isInteger(from) && from >= 0 && from < t ? from : t - 1;
+  }
+  const tab = layout[t] ?? {};
+  const tabName = ownName(tab) ?? (t === 0 ? 'root pane' : 'tab');
+  return `${tabName} › ${e.command ?? (e.cwd !== undefined ? `cwd ${e.cwd}` : 'shell')}`;
+}
+
 /** One-line description of a project, e.g. `dir .worktrees · 3 entries`. */
 export function describeProject(project) {
   const parts = [];
