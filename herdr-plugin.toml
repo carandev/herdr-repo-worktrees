@@ -2,7 +2,7 @@ id = "repo-worktrees"
 name = "Repo-relative worktrees"
 version = "0.1.0"
 min_herdr_version = "0.9.5"
-description = "Create git worktrees at a repository-relative, per-project configurable path (default .claude/worktrees/<branch-slug>), and open new workspaces in a directory you choose."
+description = "Create git worktrees at a repository-relative, per-project configurable path (default .claude/worktrees/<branch-slug>), open existing worktrees with the project layout, and open new workspaces in a directory you choose."
 platforms = ["linux", "macos", "windows"]
 
 [[actions]]
@@ -32,6 +32,26 @@ placement = "popup"
 width = "70%"
 height = "30%"
 command = ["node", "bin/workspace-prompt.mjs"]
+
+[[actions]]
+id = "open-worktree"
+title = "Open existing worktree (with layout)"
+contexts = ["workspace"]
+command = ["node", "bin/open-worktree-picker.mjs"]
+
+[[panes]]
+id = "worktree-picker"
+title = "Open worktree"
+placement = "popup"
+width = "70%"
+height = "50%"
+command = ["node", "bin/worktree-picker.mjs"]
+
+[[actions]]
+id = "apply-layout"
+title = "Apply project layout to this workspace"
+contexts = ["workspace"]
+command = ["node", "bin/apply-layout.mjs"]
 
 [[actions]]
 id = "configure"

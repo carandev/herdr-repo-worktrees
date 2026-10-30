@@ -76,12 +76,13 @@ export function resolveLayoutCwds({ layout, worktreePath, pathApi = nodePath }) 
 }
 
 /**
- * Applies a validated layout (entries without `split` open a new tab) to the freshly created worktree's workspace.
+ * Applies a validated layout (entries without `split` open a new tab) to a worktree's workspace.
+ * The workspace is `workspaceId`, else the one in `createOutput` (`herdr worktree create|open` stdout).
  * Ports: herdr(args) -> {stdout}, fs {isDirectory(path) -> boolean}.
  * Returns { paneIds } (index-aligned with `layout`).
  */
-export async function applyLayout({ layout, worktreePath, createOutput, herdr, fs, pathApi = nodePath }) {
-  const workspaceId = parseWorkspaceId(createOutput);
+export async function applyLayout({ layout, worktreePath, createOutput, workspaceId: givenId, herdr, fs, pathApi = nodePath }) {
+  const workspaceId = givenId ?? parseWorkspaceId(createOutput);
   const cwds = resolveLayoutCwds({ layout, worktreePath, pathApi });
   for (let i = 0; i < cwds.length; i += 1) {
     if (!(await fs.isDirectory(cwds[i]))) throw new Error(`Layout entry ${i} cwd does not exist: ${cwds[i]}`);

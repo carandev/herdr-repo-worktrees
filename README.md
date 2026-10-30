@@ -71,6 +71,28 @@ type = "plugin_action"
 command = "repo-worktrees.new-workspace"
 ```
 
+### Open an existing worktree with its layout
+
+The `open-worktree` action lists the repository's worktrees (from `herdr worktree list`) in a popup. Type to filter by branch or path, pick one with Up/Down, and press Enter. The plugin runs `herdr worktree open --path <worktree> --focus`, then applies the project's `layout` (see [Per-project settings](#per-project-settings-and-pane-layout)) to the new workspace.
+
+- The list starts on the first linked worktree that is not open yet. Worktrees that are already open are marked `open`.
+- Opening a worktree that already has a workspace only focuses it. The layout is not applied again.
+- Esc clears the filter first, then cancels. Ctrl+C always cancels. Without a TTY, a numbered list is printed instead.
+
+The `apply-layout` action has no popup. It applies the project's layout to the **current** workspace, for example one you opened with Herdr's native worktree picker. Layout `cwd`s are resolved against that workspace's own checkout. If the workspace already has more than one tab, nothing is applied (it is treated as already laid out). Otherwise entry 0 runs in the focused pane and renames its tab, and later entries add splits and tabs next to whatever is already open. Errors are written to the plugin log (`herdr plugin log`).
+
+```toml
+[[keys.command]]
+key = "prefix+alt+o"
+type = "plugin_action"
+command = "repo-worktrees.open-worktree"
+
+[[keys.command]]
+key = "prefix+alt+l"
+type = "plugin_action"
+command = "repo-worktrees.apply-layout"
+```
+
 ## Configuration
 
 Two files are read:
@@ -118,7 +140,7 @@ While editing a value: Enter or Tab applies it, Esc cancels, and Ctrl+U clears i
 
 ### Per-project settings and pane layout
 
-The user config (`$HERDR_PLUGIN_CONFIG_DIR/config.json`) may define a `projects` map. After the worktree is created, the project's `layout` is applied to the new workspace.
+The user config (`$HERDR_PLUGIN_CONFIG_DIR/config.json`) may define a `projects` map. After the worktree is created (or opened with `open-worktree`), the project's `layout` is applied to the new workspace.
 
 ```json
 {
